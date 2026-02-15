@@ -1,0 +1,1 @@
+"""Sonar scanner adapters."""

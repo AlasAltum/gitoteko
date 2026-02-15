@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gitoteko"
+version = "0.1.0"
+description = "CLI tool to scan Git workspaces and run pluggable repository actions"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [{ name = "AlasAltum" }]
+dependencies = []
+
+[project.scripts]
+git-workspace-tool = "git_workspace_tool.cli.main:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
