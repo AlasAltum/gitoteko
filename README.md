@@ -1,4 +1,4 @@
-# Git Workspace Tool
+# Gitoteko - Git Workspace Tool
 
 Python CLI for scanning a Git provider workspace (GitHub, Bitbucket, GitLab) and running pluggable per-repository actions across **all repositories** in that workspace.
 
