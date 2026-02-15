@@ -9,5 +9,8 @@ class LocalFileSystemAdapter(FileSystemPort):
     def ensure_directory(self, path: Path) -> None:
         path.mkdir(parents=True, exist_ok=True)
 
+    def path_exists(self, path: Path) -> bool:
+        return path.exists()
+
     def list_files_recursive(self, path: Path):
         return path.rglob("*")

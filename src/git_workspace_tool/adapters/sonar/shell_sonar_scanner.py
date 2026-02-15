@@ -1,11 +1,12 @@
 from __future__ import annotations
+"""Deprecated compatibility shim.
 
-from pathlib import Path
+Sonar runtime now belongs to `git_workspace_tool.rules.sonar_runtime` because
+Sonar is rule-specific and not part of the core domain ports/adapters.
+"""
 
-from git_workspace_tool.domain.ports import SonarScannerPort
+from git_workspace_tool.rules.sonar_runtime import ShellSonarScannerRunner
 
 
-class ShellSonarScannerAdapter(SonarScannerPort):
-    def run(self, repo_path: Path, sonar_url: str, token: str) -> tuple[int, str, str]:
-        # Placeholder for Task 10 implementation.
-        raise NotImplementedError
+class ShellSonarScannerAdapter(ShellSonarScannerRunner):
+    """Backward-compatible alias; prefer `ShellSonarScannerRunner`."""
