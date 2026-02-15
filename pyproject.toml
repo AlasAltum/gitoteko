@@ -11,6 +11,10 @@ requires-python = ">=3.11"
 authors = [{ name = "AlasAltum" }]
 dependencies = []
 
+[project.urls]
+Homepage = "https://github.com/AlasAltum/gitoteko"
+Issues = "https://github.com/AlasAltum/gitoteko/issues"
+
 [project.scripts]
 git-workspace-tool = "git_workspace_tool.cli.main:main"
 
