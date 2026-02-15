@@ -8,6 +8,38 @@ Scope reminders:
 - Full Bitbucket workspace scan by default (no project-filtered subset unless explicitly requested).
 - Human-centered validation steps.
 
+## Task delivery documentation
+
+For each completed task, add a short high-level implementation note in `docs/` using this naming pattern:
+
+- `<task-number>_<short_name>.md`
+
+Each note should include:
+- objective
+- high-level design/changes
+- verification done
+- why the implementation is considered acceptable
+
+Current notes:
+- [Task 5 note](5_shell_git_client_adapter.md)
+- [Task 6 note](6_git_workspace_scanner_use_case.md)
+- [Task 7 note](7_language_detection_action.md)
+- [Task 8 note](8_csv_report_action.md)
+- [Task 9 note](9_sonar_properties_generation_action.md)
+- [Task 10 note](10_sonar_scanner_adapter_and_action.md)
+- [CLI runtime wiring note](cli_runtime_wiring_bitbucket_dry_run.md)
+- [CLI env fallback and single-repo filter note](cli_env_fallback_and_single_repo_filter.md)
+- [Sonar boundary refactor note](sonar_boundary_refactor.md)
+- [Logging and git pull diagnostics note](logging_and_git_pull_diagnostics.md)
+- [Task 11 note](11_cli_action_toggles_and_composition.md)
+- [Task 12 note](12_logging_error_policy_and_summary.md)
+- [Task 13 note](13_manual_validation_guide.md)
+- [Task 14 note](14_semi_automation_preparation.md)
+- [Task 15 note](15_sonar_execution_pacing_and_wait_mode.md)
+- [Task 16 note](16_readme_operator_guide_refresh.md)
+- [Task 17 note](17_docs_contract_consistency_cleanup.md)
+- [Task 18 note](../18_sonar_skip_unchanged_and_rule_authoring.md)
+
 ## Task 1 — Project skeleton and package boundaries
 
 ### What to do (high level)
@@ -26,7 +58,8 @@ Scope reminders:
 
 ### What to do (high level)
 - Implement domain entities (`Repository`, `RepoContext`, `ActionResult`, etc.).
-- Define port interfaces (`GitProviderPort`, `GitClientPort`, `SonarScannerPort`, filesystem abstraction if used).
+- Define core port interfaces (`GitProviderPort`, `GitClientPort`, filesystem abstraction if used).
+- Keep Sonar execution contracts in rules layer (not core domain ports).
 - Implement `Action` contract and `ActionPipeline`.
 
 ### How to check correctness
@@ -41,16 +74,16 @@ Scope reminders:
 
 ### What to do (high level)
 - Parse required and optional CLI args using `argparse`.
-- Resolve env defaults and CLI override precedence.
-- Implement token resolution for `env:VAR_NAME` format.
+- Keep core config focused on orchestration inputs (`provider`, `workspace`, `base_dir`, `dry_run`).
+- Keep rule-specific configuration out of core config (rules own their env/flags).
 
 ### How to check correctness
 - Missing required inputs produce clear errors.
-- CLI values override env values.
-- Defaults match specification.
+- Core CLI rejects unknown rule-specific flags unless a rule extension explicitly adds them.
+- Core config remains stable even as new rules are added.
 
 ### Test step
-- Human run: try combinations of env-only, CLI-only, and mixed inputs; compare effective config in logs.
+- Human run: invoke core CLI with required args and `--dry-run`, then pass a rule-specific flag and verify it is rejected by core.
 
 ## Task 4 — Bitbucket Cloud provider adapter
 
@@ -160,18 +193,15 @@ Scope reminders:
 ## Task 11 — CLI action toggles and composition
 
 ### What to do (high level)
-- Wire CLI flags to include/exclude actions:
-  - `--skip-sonar`
-  - `--skip-language-detection`
-  - `--skip-sonar-file-generation`
-- Build pipeline dynamically from selected flags.
+- Build pipeline dynamically from selected action registrations.
+- If action toggles are needed, define them in the action pack/extension layer, not in the core CLI.
 
 ### How to check correctness
-- Flag combinations produce correct action list.
-- Skipped actions produce no side effects.
+- Enabled/disabled action composition produces the expected action list.
+- Core CLI remains unchanged when adding/removing rule-specific toggles.
 
 ### Test step
-- Human run: test at least three flag combinations and verify which artifacts are created.
+- Human run: run core with different registered action sets and verify which artifacts are created.
 
 ## Task 12 — Logging, error policy, and run summary
 
@@ -212,3 +242,22 @@ Scope reminders:
 
 ### Test step
 - Human run: use helper scripts and confirm outputs match manual process.
+
+## Task 15 — Sonar execution pacing and wait mode
+
+### What to do (high level)
+- Add Sonar rule runtime controls for paced execution to avoid backpressure.
+- Add explicit wait mode configuration:
+  - synchronous: wait for each submitted analysis result before continuing.
+  - asynchronous: submit and continue without waiting for processing completion.
+- Add configurable pacing controls (for example: per-repo delay seconds and/or max analyses per minute).
+- Ensure defaults are conservative for production Sonar instances.
+
+### How to check correctness
+- Execution rate is bounded according to configured pacing values.
+- In synchronous mode, next repository is processed only after previous Sonar background task reaches terminal state.
+- In asynchronous mode, submission does not block on Sonar background processing.
+- Logs clearly show submission time, wait decisions, and Sonar task IDs.
+
+### Test step
+- Human run: process a small repository batch with synchronous mode and verify sequential completion; re-run with asynchronous mode and verify faster submissions with bounded pacing.
