@@ -1,6 +1,12 @@
 # Git Workspace Tool
 
-Python CLI for scanning a Git provider workspace and running pluggable per-repository actions.
+Python CLI for scanning a Git provider workspace (GitHub, Bitbucket, GitLab) and running pluggable per-repository actions across **all repositories** in that workspace.
+
+Use cases:
+- Apply code quality rules (SonarQube scans) to all repositories
+- Detect programming languages across your organization's codebase
+- Generate reports or perform batch operations on multiple repositories
+- Migrate repositories from one provider to another
 
 Rules are implemented with a hexagonal architecture boundary and a strategy pattern:
 
@@ -9,9 +15,11 @@ Rules are implemented with a hexagonal architecture boundary and a strategy patt
 
 ## Requirements
 
-- Python virtual environment available at `.venv`
-- Git + SSH access configured for the target provider (Github, Bitbucket, Gitlab)
-- Environment values configured in `.env`
+- Python 3.11 or higher
+- Git CLI installed and available in PATH
+- SSH access configured for the target provider (GitHub, Bitbucket, GitLab)
+  - SSH keys already set up for repository cloning
+- No external Python dependencies (uses standard library only)
 
 ## Core behavior
 
@@ -24,22 +32,60 @@ The scanner:
 
 Repositories are cached in `BASE_DIR` and are not auto-deleted.
 
+## Setup
+
+1. Clone this repository:
+```bash
+git clone https://github.com/AlasAltum/gitoteko.git
+cd gitoteko
+```
+
+2. Create Python virtual environment:
+```bash
+python3 -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+```
+
+3. Install the package in editable mode:
+```bash
+pip install -e .
+```
+
+4. Copy and configure environment file:
+```bash
+cp .env.example .env
+# Edit .env with your credentials:
+# - BITBUCKET_TOKEN or BITBUCKET_USERNAME/BITBUCKET_APP_PASSWORD
+# - GIT_WORKSPACE (your organization/workspace name)
+# - BASE_DIR (where repositories will be cloned)
+# - SONARQUBE_URL and SONARQUBE_TOKEN (if using Sonar scans)
+```
+
 ## Quick start
 
-From repository root:
+Dry-run (lists repositories without cloning):
 
 ```bash
 set -a && source .env && set +a
 PYTHONPATH=src .venv/bin/python -m git_workspace_tool --dry-run
 ```
 
-## Real run sample (first 3 repositories)
+## Real run examples
+
+**Test run with first 3 repositories** (useful when analyzing a whole workspace with many repos):
 
 ```bash
 set -a && source .env && set +a
 PYTHONPATH=src .venv/bin/python -m git_workspace_tool \
 	--max-repos 3 \
 	--repo-selection first
+```
+
+**Full workspace scan** (all repositories):
+
+```bash
+set -a && source .env && set +a
+PYTHONPATH=src .venv/bin/python -m git_workspace_tool
 ```
 
 ## Action pipeline configuration
@@ -64,7 +110,7 @@ Supported action names:
 - `generate-sonar-properties`
 - `run-sonar-scan`
 
-## SonarQube (remote) execution controls
+## SonarQube (remote) execution controls for code scanning
 
 Use remote host URL only (no endpoint suffix):
 
@@ -73,7 +119,7 @@ export SONARQUBE_URL="https://<your-sonarqube-host>"
 export SONARQUBE_TOKEN="<token>"
 ```
 
-Backpressure controls to avoid 
+Backpressure controls to avoid overloading SonarQube server:
 
 ```bash
 export SONAR_WAIT_MODE=sync
