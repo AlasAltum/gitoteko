@@ -13,7 +13,14 @@ from typing import Callable, Protocol
 class SonarScannerRunner(Protocol):
     """Rule-scoped contract for executing SonarScanner."""
 
-    def run(self, repo_path: Path, sonar_url: str, token: str) -> tuple[int, str, str]:
+    def run(
+        self,
+        repo_path: Path,
+        sonar_url: str,
+        token: str,
+        *,
+        branch_name: str | None = None,
+    ) -> tuple[int, str, str]:
         """Execute scanner and return `(exit_code, stdout, stderr)`."""
         ...
 
@@ -32,12 +39,21 @@ class ShellSonarScannerRunner:
         self._timeout_seconds = timeout_seconds
         self._runner = runner
 
-    def run(self, repo_path: Path, sonar_url: str, token: str) -> tuple[int, str, str]:
+    def run(
+        self,
+        repo_path: Path,
+        sonar_url: str,
+        token: str,
+        *,
+        branch_name: str | None = None,
+    ) -> tuple[int, str, str]:
         command = [
             self._scanner_executable,
             f"-Dsonar.host.url={sonar_url}",
             f"-Dsonar.token={token}",
         ]
+        if branch_name and branch_name != "main":
+            command.append(f"-Dsonar.branch.name={branch_name}")
 
         try:
             completed = self._runner(

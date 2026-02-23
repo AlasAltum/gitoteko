@@ -170,12 +170,10 @@ def _build_action_pipeline(base_dir: Path, env: Mapping[str, str]) -> ActionPipe
             continue
 
         if action_name == "run-sonar-scan":
-            scanner_executable = (env.get("SONAR_SCANNER_EXECUTABLE") or "sonar-scanner").strip()
-            scanner_timeout_seconds = _parse_float(
-                env.get("SONAR_SCANNER_TIMEOUT_SECONDS", "1800"),
-                "SONAR_SCANNER_TIMEOUT_SECONDS",
-                minimum=1.0,
-            )
+            execution_mode = (env.get("SONAR_EXECUTION_MODE") or "local").strip().lower()
+            if execution_mode not in {"cloud", "local", "ci"}:
+                raise RuntimeError("SONAR_EXECUTION_MODE must be one of: cloud, local, ci")
+
             wait_mode = (env.get("SONAR_WAIT_MODE") or "sync").strip().lower()
             if wait_mode not in {"sync", "async"}:
                 raise RuntimeError("SONAR_WAIT_MODE must be one of: sync, async")
@@ -204,14 +202,23 @@ def _build_action_pipeline(base_dir: Path, env: Mapping[str, str]) -> ActionPipe
                 "SONAR_FORCE_SCAN",
             )
             state_file_relative_path = (env.get("SONAR_STATE_FILE") or ".git/gitoteko_sonar_state.json").strip()
+            scanner = None
+            if execution_mode == "local":
+                scanner_executable = (env.get("SONAR_SCANNER_EXECUTABLE") or "sonar-scanner").strip()
+                scanner_timeout_seconds = _parse_float(
+                    env.get("SONAR_SCANNER_TIMEOUT_SECONDS", "1800"),
+                    "SONAR_SCANNER_TIMEOUT_SECONDS",
+                    minimum=1.0,
+                )
+                scanner = ShellSonarScannerRunner(
+                    scanner_executable=scanner_executable,
+                    timeout_seconds=scanner_timeout_seconds,
+                )
 
-            scanner = ShellSonarScannerRunner(
-                scanner_executable=scanner_executable,
-                timeout_seconds=scanner_timeout_seconds,
-            )
             actions.append(
                 RunSonarScannerAction(
                     scanner=scanner,
+                    execution_mode=execution_mode,
                     wait_mode=wait_mode,
                     submission_delay_seconds=submission_delay_seconds,
                     poll_interval_seconds=poll_interval_seconds,
@@ -267,3 +274,23 @@ def _print_summary(summary: ScanExecutionSummary) -> None:
         print(f"  planned actions: {action_list}")
         if item.error:
             print(f"  error: {item.error}")
+
+    sonar_expected: list[str] = []
+    sonar_not_expected: list[str] = []
+    for item in summary.repositories:
+        sonar_action = next(
+            (result for result in item.action_results if result.action_name == "RunSonarScannerAction"),
+            None,
+        )
+        if sonar_action and sonar_action.success:
+            sonar_expected.append(item.repo_slug)
+        else:
+            sonar_not_expected.append(item.repo_slug)
+
+    print("Sonar report:")
+    print(f"  expected scans available: {len(sonar_expected)}")
+    for slug in sonar_expected:
+        print(f"  - {slug}")
+    print(f"  expected missing scans: {len(sonar_not_expected)}")
+    for slug in sonar_not_expected:
+        print(f"  - {slug}")

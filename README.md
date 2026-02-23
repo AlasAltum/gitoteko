@@ -117,7 +117,39 @@ Use remote host URL only (no endpoint suffix):
 ```bash
 export SONARQUBE_URL="https://<your-sonarqube-host>"
 export SONARQUBE_TOKEN="<token>"
+export SONAR_EXECUTION_MODE=local
 ```
+
+- `SONAR_EXECUTION_MODE=local` (default): run `sonar-scanner` from the machine running this CLI, and submit analysis to your remote SonarQube server (`SONARQUBE_URL`).
+- `SONAR_EXECUTION_MODE=cloud`: query Sonar server APIs only (status/quality-gate checks); does **not** submit new analysis.
+- `SONAR_EXECUTION_MODE=ci`: trigger Bitbucket Pipelines so `sonar-scanner` runs on CI/runner.
+
+Important: if you use `SONAR_EXECUTION_MODE=local`, you must have a `sonar-scanner` binary available on the CLI machine (or set `SONAR_SCANNER_EXECUTABLE` to its absolute path).
+
+For CI/runner execution (recommended when local execution is not allowed):
+
+```bash
+export SONAR_EXECUTION_MODE=ci
+export SONAR_CI_PROVIDER=bitbucket
+# Optional: custom pipeline selector pattern
+export SONAR_CI_PIPELINE_SELECTOR=sonar-scan
+# Optional: override branch; otherwise repository main branch is used
+export SONAR_CI_REF_NAME=main
+# Optional: forward SONAR_HOST_URL and SONAR_TOKEN as pipeline variables
+export SONAR_CI_FORWARD_SONAR_ENV=false
+```
+
+Note: repositories must already have a Bitbucket Pipeline configured to run `sonar-scanner`.
+
+If you need local scanner mode:
+
+```bash
+export SONAR_EXECUTION_MODE=local
+export SONAR_SCANNER_EXECUTABLE=sonar-scanner
+export SONAR_SCANNER_TIMEOUT_SECONDS=1800
+```
+
+For a complete explanation of Sonar modes, prerequisites, and Java/non-Java behavior, see [docs/sonar_execution_guide.md](docs/sonar_execution_guide.md).
 
 Backpressure controls to avoid overloading SonarQube server:
 
@@ -153,8 +185,11 @@ To stop on first failure:
 export GIT_STOP_ON_ERROR=true
 ```
 
+With `GIT_STOP_ON_ERROR=true`, execution stops immediately on the first failed action or repository sync error.
+
 
 ## Additional docs
 
 - [Prompt/spec](docs/prompt.md)
 - [How to add a new rule](docs/adding_new_rules.md)
+- [Sonar execution guide](docs/sonar_execution_guide.md)

@@ -51,11 +51,30 @@ class ShellGitClientAdapter(GitClientPort):
         )
 
         self._run_git(["fetch", "--prune", "origin"], cwd=local_path)
+        self._refresh_remote_head(local_path)
+
+        current_branch = self._get_current_branch(local_path)
+        primary_branch = self._resolve_primary_branch(local_path, current_branch)
+
+        if primary_branch and current_branch != primary_branch:
+            self._logger.info(
+                "switching to repository primary branch before pull",
+                extra={
+                    "event": "git.pull.branch.switch",
+                    "local_path": str(local_path),
+                    "from_branch": current_branch,
+                    "to_branch": primary_branch,
+                },
+            )
+            self._checkout_branch(local_path, primary_branch)
+            current_branch = primary_branch
+
+        if primary_branch and not self._has_upstream(local_path):
+            self._set_upstream(local_path, primary_branch)
 
         if self._has_upstream(local_path):
             self._run_git(["pull", "--ff-only"], cwd=local_path)
         else:
-            current_branch = self._get_current_branch(local_path)
             default_branch = self._get_default_remote_branch(local_path)
 
             self._logger.info(
@@ -72,6 +91,10 @@ class ShellGitClientAdapter(GitClientPort):
                 self._run_git(["pull", "--ff-only", "origin", current_branch], cwd=local_path)
             elif default_branch:
                 self._run_git(["pull", "--ff-only", "origin", default_branch], cwd=local_path)
+            elif self._remote_branch_exists(local_path, "main"):
+                self._run_git(["pull", "--ff-only", "origin", "main"], cwd=local_path)
+            elif self._remote_branch_exists(local_path, "master"):
+                self._run_git(["pull", "--ff-only", "origin", "master"], cwd=local_path)
             else:
                 raise RuntimeError(
                     f"Cannot pull repository: no upstream and no resolvable remote default branch: {local_path}"
@@ -105,9 +128,53 @@ class ShellGitClientAdapter(GitClientPort):
             return value.split("/", 1)[1]
         return None
 
+    def _refresh_remote_head(self, cwd: Path) -> None:
+        result = self._run_git_allow_fail(["remote", "set-head", "origin", "-a"], cwd=cwd)
+        if result.returncode != 0:
+            self._logger.info(
+                "unable to refresh origin HEAD; continuing with current refs",
+                extra={
+                    "event": "git.remote_head.refresh.failed",
+                    "cwd": str(cwd),
+                },
+            )
+
     def _remote_branch_exists(self, cwd: Path, branch: str) -> bool:
         result = self._run_git_allow_fail(["show-ref", "--verify", f"refs/remotes/origin/{branch}"], cwd=cwd)
         return result.returncode == 0
+
+    def _local_branch_exists(self, cwd: Path, branch: str) -> bool:
+        result = self._run_git_allow_fail(["show-ref", "--verify", f"refs/heads/{branch}"], cwd=cwd)
+        return result.returncode == 0
+
+    def _resolve_primary_branch(self, cwd: Path, current_branch: str | None) -> str | None:
+        candidates: list[str] = []
+        default_branch = self._get_default_remote_branch(cwd)
+        if default_branch:
+            candidates.append(default_branch)
+        candidates.extend(["master", "main"])
+        if current_branch and current_branch != "HEAD":
+            candidates.append(current_branch)
+
+        seen: set[str] = set()
+        for branch in candidates:
+            if branch in seen:
+                continue
+            seen.add(branch)
+            if self._remote_branch_exists(cwd, branch):
+                return branch
+        return None
+
+    def _checkout_branch(self, cwd: Path, branch: str) -> None:
+        if self._local_branch_exists(cwd, branch):
+            self._run_git(["checkout", branch], cwd=cwd)
+            return
+        self._run_git(["checkout", "-b", branch, "--track", f"origin/{branch}"], cwd=cwd)
+
+    def _set_upstream(self, cwd: Path, branch: str) -> None:
+        if not self._remote_branch_exists(cwd, branch):
+            return
+        self._run_git(["branch", "--set-upstream-to", f"origin/{branch}", branch], cwd=cwd)
 
     def _run_git_allow_fail(self, args: Sequence[str], cwd: Path) -> subprocess.CompletedProcess[str]:
         command = [self._git_executable, *args]
