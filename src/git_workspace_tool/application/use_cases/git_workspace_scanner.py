@@ -179,7 +179,7 @@ class GitWorkspaceScanner:
                     repository=repository,
                     local_path=local_path,
                 )
-                action_results = tuple(self.action_pipeline.run(context))
+                action_results = tuple(self.action_pipeline.run(context, fail_fast=stop_on_error))
 
                 action_failed = any(not result.success for result in action_results)
                 repo_success = not action_failed

@@ -46,12 +46,19 @@ class ActionPipeline:
         """Read-only ordered actions configured for this pipeline."""
         return self._actions
 
-    def run(self, repo_context: RepoContext) -> list[ActionResult]:
-        """Run all configured actions in order for one repository context."""
+    def run(self, repo_context: RepoContext, *, fail_fast: bool = False) -> list[ActionResult]:
+        """Run configured actions in order for one repository context.
+
+        Args:
+            repo_context: Mutable per-repository execution context.
+            fail_fast: Stop executing remaining actions after first failed action.
+        """
         results: list[ActionResult] = []
         for action in self._actions:
             result = action.execute(repo_context)
             if not result.action_name:
                 result.action_name = action.name
             results.append(result)
+            if fail_fast and not result.success:
+                break
         return results
